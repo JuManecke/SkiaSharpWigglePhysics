@@ -1,0 +1,12 @@
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\bin\Release\net6.0\Wiggle.Core.deps.json
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\bin\Release\net6.0\Wiggle.Core.dll
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\bin\Release\net6.0\Wiggle.Core.pdb
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\Wiggle.Core.csproj.AssemblyReference.cache
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\Wiggle.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\Wiggle.Core.AssemblyInfoInputs.cache
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\Wiggle.Core.AssemblyInfo.cs
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\Wiggle.Core.csproj.CoreCompileInputs.cache
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\Wiggle.Core.dll
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\refint\Wiggle.Core.dll
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\Wiggle.Core.pdb
+C:\Users\JMane\OneDrive - Mediadesign Hochschule für Design und Informatik\UNI\Tool & Backend Development - Dustin\Exam\SkiaSharpWigglePhysics\src\Wiggle.Core\obj\Release\net6.0\ref\Wiggle.Core.dll

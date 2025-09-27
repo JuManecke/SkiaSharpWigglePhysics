@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "dgSpecHash": "ixjIaHnOvp/Ajpu+wRkw+Dg9Oj4nzf7UDCFzfChzpbL+b7fBc3GuJzbIBruvWbYs7RAmY9u35d7mOyNU3Jxm6g==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\JMane\\OneDrive - Mediadesign Hochschule für Design und Informatik\\UNI\\Tool & Backend Development - Dustin\\Exam\\SkiaSharpWigglePhysics\\src\\Wiggle.Cli\\Wiggle.Cli.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\JMane\\.nuget\\packages\\skiasharp\\2.88.3\\skiasharp.2.88.3.nupkg.sha512",
+    "C:\\Users\\JMane\\.nuget\\packages\\skiasharp.nativeassets.macos\\2.88.3\\skiasharp.nativeassets.macos.2.88.3.nupkg.sha512",
+    "C:\\Users\\JMane\\.nuget\\packages\\skiasharp.nativeassets.win32\\2.88.3\\skiasharp.nativeassets.win32.2.88.3.nupkg.sha512",
+    "C:\\Users\\JMane\\.nuget\\packages\\microsoft.netcore.app.ref\\6.0.29\\microsoft.netcore.app.ref.6.0.29.nupkg.sha512",
+    "C:\\Users\\JMane\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\6.0.29\\microsoft.windowsdesktop.app.ref.6.0.29.nupkg.sha512",
+    "C:\\Users\\JMane\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\6.0.29\\microsoft.aspnetcore.app.ref.6.0.29.nupkg.sha512",
+    "C:\\Users\\JMane\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\6.0.29\\microsoft.netcore.app.host.win-x64.6.0.29.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Package 'SkiaSharp' 2.88.3 has a known high severity vulnerability, https://github.com/advisories/GHSA-j7hp-h8jx-5ppr",
+      "libraryId": "SkiaSharp",
+      "targetGraphs": [
+        "net6.0"
+      ]
+    }
+  ]
+}

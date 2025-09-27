@@ -1,0 +1,1 @@
+-e "bin/\nobj/\n.vs/\n.idea/\n**/artifacts/\n*.user\n" 

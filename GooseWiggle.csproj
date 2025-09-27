@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>SkiaSharpTriangleWindow</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="2.88.3" />
+    <PackageReference Include="SkiaSharp.Views.WindowsForms" Version="2.88.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="src\Wiggle.Cli\**" />
+    <Compile Remove="src\Wiggle.Core\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Remove="src\Wiggle.Cli\**" />
+    <EmbeddedResource Remove="src\Wiggle.Core\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="src\Wiggle.Cli\**" />
+    <None Remove="src\Wiggle.Core\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="src\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="src\Wiggle.Core\Wiggle.Core.csproj" />
+  </ItemGroup>
+</Project>
