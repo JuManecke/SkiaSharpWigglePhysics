@@ -1,9 +1,9 @@
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
 using Wiggle.Core;
 using Wiggle.Core.Presets;
@@ -22,17 +22,12 @@ namespace GooseWiggle
 
     public sealed class GooseForm : Form
     {
-        // CLI options
         private string? _triPath;
-        private readonly bool _openLatest;
-        private readonly bool _fallbackGoose;
-        private readonly Size? _explicitSize; // --size=WxH
+        private readonly Size? _explicitSize;
 
-        // UI
         private readonly SKControl _canvas;
         private readonly Timer _frameTimer;
 
-        // Simulation
         private SoftBody _body = null!;
         private DateTime _lastFrameTime;
         private Vec2 _prevWinPos;
@@ -43,35 +38,40 @@ namespace GooseWiggle
 
         public GooseForm(string[]? args = null)
         {
-            // parse flags
-            string? tri = null; bool openLatest = false; bool fallbackGoose = false; Size? explicitSz = null;
+            Size? explicitSz = null;
             if (args != null)
             {
-                foreach (var a in args)
+                for (int i = 0; i < args.Length; i++)
                 {
-                    if (a.StartsWith("--tri=")) tri = a.Substring("--tri=".Length).Trim().Trim('\"', ' ');
-                    else if (a == "--open-latest") openLatest = true;
-                    else if (a == "--fallback=goose") fallbackGoose = true;
-                    else if (a.StartsWith("--size="))
+                    string a = args[i];
+                    if (a.StartsWith("--size="))
                     {
-                        var s = a.Substring("--size=".Length);
-                        var parts = s.Split('x', 'X');
-                        if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
-                            explicitSz = new Size(Math.Max(200, w), Math.Max(200, h));
+                        string s = a.Substring("--size=".Length);
+                        string[] parts = s.Split(new char[] { 'x', 'X' }, StringSplitOptions.RemoveEmptyEntries);
+                        int w, h;
+                        if (parts.Length == 2 && int.TryParse(parts[0], out w) && int.TryParse(parts[1], out h))
+                        {
+                            if (w < 200) w = 200;
+                            if (h < 200) h = 200;
+                            explicitSz = new Size(w, h);
+                        }
                     }
                 }
             }
-            _triPath = tri; _openLatest = openLatest; _fallbackGoose = fallbackGoose; _explicitSize = explicitSz;
+
+            _triPath = GetTrianglesPath(args);
+            _explicitSize = explicitSz;
 
             Text = "Goose Triangle-Softbody 2D – Wiggle Physics";
-            ClientSize = new Size(820, 820); // temp; adjusted after loading
+            ClientSize = new Size(820, 820);
 
-            _canvas = new SKControl { Dock = DockStyle.Fill };
-            _canvas.PaintSurface += OnPaintSurface;
-            _canvas.MouseDown += OnMouseDown;
-            _canvas.MouseMove += OnMouseMove;
-            _canvas.MouseUp += OnMouseUp;
-            _canvas.MouseLeave += (_, __) => _body?.EndDrag();
+            _canvas = new SKControl();
+            _canvas.Dock = DockStyle.Fill;
+            _canvas.PaintSurface += Canvas_PaintSurface;
+            _canvas.MouseDown += Canvas_MouseDown;
+            _canvas.MouseMove += Canvas_MouseMove;
+            _canvas.MouseUp += Canvas_MouseUp;
+            _canvas.MouseLeave += Canvas_MouseLeave;
             Controls.Add(_canvas);
 
             BuildBodyAndSizeWindow();
@@ -79,116 +79,131 @@ namespace GooseWiggle
             _lastFrameTime = DateTime.Now;
             _prevWinPos = WindowScreenPosition();
 
-            _frameTimer = new Timer { Interval = 16 };
-            _frameTimer.Tick += (_, __) => TickFrame();
+            _frameTimer = new Timer();
+            _frameTimer.Interval = 16;
+            _frameTimer.Tick += FrameTimer_Tick;
             _frameTimer.Start();
         }
 
         private void BuildBodyAndSizeWindow()
         {
-            // 1) Load triangles (or goose preset)
             List<Triangle>? tris = null;
             try
             {
-                if (!string.IsNullOrWhiteSpace(_triPath) && System.IO.File.Exists(_triPath))
+                if (!string.IsNullOrWhiteSpace(_triPath) && File.Exists(_triPath))
                 {
                     tris = TriangleIo.Load(_triPath);
                 }
-                else if (_openLatest)
-                {
-                    var imagesDir = System.IO.Path.GetFullPath(
-                        System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Images"));
-                    if (System.IO.Directory.Exists(imagesDir))
-                    {
-                        var files = System.IO.Directory.GetFiles(imagesDir, "*.json");
-                        if (files.Length > 0)
-                        {
-                            Array.Sort(files, (a, b) => System.IO.File.GetLastWriteTime(b).CompareTo(System.IO.File.GetLastWriteTime(a)));
-                            _triPath = files[0];
-                            tris = TriangleIo.Load(_triPath);
-                        }
-                    }
-                }
             }
-            catch { /* ignore */ }
+            catch { }
 
-            if (tris == null || tris.Count == 0) tris = Goose.Create();
-
-            // 2) Compute source bbox (in JSON/image coordinates)
-            GetBounds(tris, out float minX, out float minY, out float maxX, out float maxY);
-            float srcW = MathF.Max(1, maxX - minX);
-            float srcH = MathF.Max(1, maxY - minY);
+            if (tris == null || tris.Count == 0)
+            {
+                tris = Goose.Create();
+            }
+            
+            float minX, minY, maxX, maxY;
+            GetBounds(tris, out minX, out minY, out maxX, out maxY);
+            float srcW = MathF.Max(1f, maxX - minX);
+            float srcH = MathF.Max(1f, maxY - minY);
             float aspect = srcW / srcH;
 
-            // 3) Choose inner (content) size by aspect or explicit window size
+            // choose inner size
             Size inner;
             if (_explicitSize.HasValue)
             {
-                var full = _explicitSize.Value;
-                inner = new Size(Math.Max(200, full.Width - 2 * FrameStrokeWidth),
-                                 Math.Max(200, full.Height - 2 * FrameStrokeWidth));
+                Size full = _explicitSize.Value;
+                inner = new Size(
+                    Math.Max(200, full.Width - 2 * FrameStrokeWidth),
+                    Math.Max(200, full.Height - 2 * FrameStrokeWidth)
+                );
             }
             else
             {
                 int longSide = 900;
-                inner = (aspect >= 1f)
-                    ? new Size(longSide, Math.Max(300, (int)(longSide / aspect)))
-                    : new Size(Math.Max(300, (int)(longSide * aspect)), longSide);
+                if (aspect >= 1f)
+                {
+                    inner = new Size(longSide, Math.Max(300, (int)(longSide / aspect)));
+                }
+                else
+                {
+                    inner = new Size(Math.Max(300, (int)(longSide * aspect)), longSide);
+                }
             }
 
-            // 4) Set window client size = inner + frame
+            // window size = inner + border
             ClientSize = new Size(inner.Width + 2 * FrameStrokeWidth, inner.Height + 2 * FrameStrokeWidth);
 
-            // 5) Fit triangles into the inner rectangle (scale + center)
-            var innerRect = InnerBoundsRectangle();
-            var fitted = FitTrianglesToRect(tris, innerRect);
+            // fit triangles into inner rect
+            SKRect innerRect = InnerBoundsRectangle();
+            List<Triangle> fitted = FitTrianglesToRect(tris, innerRect);
 
-            // 6) Build soft body from the **fitted** triangles
             _body = SoftBody.FromTriangles(fitted, innerRect);
         }
 
         private static void GetBounds(List<Triangle> tris, out float minX, out float minY, out float maxX, out float maxY)
         {
-            minX = minY = float.MaxValue; maxX = maxY = float.MinValue;
-            foreach (var t in tris)
+            minX = float.MaxValue;
+            minY = float.MaxValue;
+            maxX = float.MinValue;
+            maxY = float.MinValue;
+
+            for (int i = 0; i < tris.Count; i++)
             {
-                minX = MathF.Min(minX, MathF.Min(t.A.X, MathF.Min(t.B.X, t.C.X)));
-                minY = MathF.Min(minY, MathF.Min(t.A.Y, MathF.Min(t.B.Y, t.C.Y)));
-                maxX = MathF.Max(maxX, MathF.Max(t.A.X, MathF.Max(t.B.X, t.C.X)));
-                maxY = MathF.Max(maxY, MathF.Max(t.A.Y, MathF.Max(t.B.Y, t.C.Y)));
+                Triangle t = tris[i];
+
+                if (t.A.X < minX) minX = t.A.X;
+                if (t.B.X < minX) minX = t.B.X;
+                if (t.C.X < minX) minX = t.C.X;
+
+                if (t.A.Y < minY) minY = t.A.Y;
+                if (t.B.Y < minY) minY = t.B.Y;
+                if (t.C.Y < minY) minY = t.C.Y;
+
+                if (t.A.X > maxX) maxX = t.A.X;
+                if (t.B.X > maxX) maxX = t.B.X;
+                if (t.C.X > maxX) maxX = t.C.X;
+
+                if (t.A.Y > maxY) maxY = t.A.Y;
+                if (t.B.Y > maxY) maxY = t.B.Y;
+                if (t.C.Y > maxY) maxY = t.C.Y;
+            }
+
+            if (minX == float.MaxValue)
+            {
+                minX = minY = 0f;
+                maxX = maxY = 1f;
             }
         }
 
         private static List<Triangle> FitTrianglesToRect(List<Triangle> src, SKRect target)
         {
-            // compute bbox
-            GetBounds(src, out float minX, out float minY, out float maxX, out float maxY);
-            float w = MathF.Max(1, maxX - minX);
-            float h = MathF.Max(1, maxY - minY);
+            float minX, minY, maxX, maxY;
+            GetBounds(src, out minX, out minY, out maxX, out maxY);
 
-            // uniform scale to fit
+            float w = MathF.Max(1f, maxX - minX);
+            float h = MathF.Max(1f, maxY - minY);
+
             float sx = target.Width / w;
             float sy = target.Height / h;
-            float s = MathF.Min(sx, sy);
+            float s = sx < sy ? sx : sy;
 
-            // center inside target
             float contentW = s * w;
             float contentH = s * h;
-            float offX = target.Left + (target.Width  - contentW) * 0.5f - s * minX;
-            float offY = target.Top  + (target.Height - contentH) * 0.5f - s * minY;
 
-            static SKPoint Xform(SKPoint p, float s, float ox, float oy)
-                => new SKPoint(p.X * s + ox, p.Y * s + oy);
+            float offX = target.Left + (target.Width - contentW) * 0.5f - s * minX;
+            float offY = target.Top + (target.Height - contentH) * 0.5f - s * minY;
 
-            var dst = new List<Triangle>(src.Count);
-            foreach (var t in src)
+            List<Triangle> dst = new List<Triangle>(src.Count);
+            for (int i = 0; i < src.Count; i++)
             {
-                dst.Add(new Triangle(
-                    Xform(t.A, s, offX, offY),
-                    Xform(t.B, s, offX, offY),
-                    Xform(t.C, s, offX, offY),
-                    t.FillColor
-                ));
+                Triangle t = src[i];
+
+                SKPoint A = new SKPoint(t.A.X * s + offX, t.A.Y * s + offY);
+                SKPoint B = new SKPoint(t.B.X * s + offX, t.B.Y * s + offY);
+                SKPoint C = new SKPoint(t.C.X * s + offX, t.C.Y * s + offY);
+
+                dst.Add(new Triangle(A, B, C, t.FillColor));
             }
             return dst;
         }
@@ -199,17 +214,23 @@ namespace GooseWiggle
             return new SKRect(pad, pad, _canvas.Width - pad, _canvas.Height - pad);
         }
 
+        private void FrameTimer_Tick(object? sender, EventArgs e)
+        {
+            TickFrame();
+        }
+
         private void TickFrame()
         {
-            var now = DateTime.Now;
+            DateTime now = DateTime.Now;
             float dt = (float)(now - _lastFrameTime).TotalSeconds;
             if (dt <= 0f || dt > 0.25f) dt = 1f / 60f;
             _lastFrameTime = now;
 
-            var winPos = WindowScreenPosition();
-            var winVel = (winPos - _prevWinPos) / Math.Max(dt, 1e-6f);
-            var winAcc = (winVel - _prevWinVel) / Math.Max(dt, 1e-6f);
-            _prevWinPos = winPos; _prevWinVel = winVel;
+            Vec2 winPos = WindowScreenPosition();
+            Vec2 winVel = (winPos - _prevWinPos) / Math.Max(dt, 1e-6f);
+            Vec2 winAcc = (winVel - _prevWinVel) / Math.Max(dt, 1e-6f);
+            _prevWinPos = winPos;
+            _prevWinVel = winVel;
 
             _body.Bounds = InnerBoundsRectangle();
             _body.SimulationSteps(dt, winAcc);
@@ -217,91 +238,133 @@ namespace GooseWiggle
             _canvas.Invalidate();
         }
 
-        private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
+        private void Canvas_PaintSurface(object? sender, SKPaintSurfaceEventArgs e)
         {
-            var canvas = e.Surface.Canvas;
+            SKCanvas canvas = e.Surface.Canvas;
             canvas.Clear(SKColors.DarkGray);
 
-            using (var border = new SKPaint { Color = SKColors.Red, IsStroke = true, StrokeWidth = FrameStrokeWidth, IsAntialias = true })
+            using (SKPaint border = new SKPaint())
+            {
+                border.Color = SKColors.Red;
+                border.IsStroke = true;
+                border.StrokeWidth = FrameStrokeWidth;
+                border.IsAntialias = true;
                 canvas.DrawRect(0, 0, e.Info.Width, e.Info.Height, border);
+            }
 
-            // single bottom baseline (no fill)
-            float lowestY = (_body != null && _body.Vertices.Count > 0)
-                ? _body.Vertices.Max(v => v.CurrentPosition.Y)
-                : e.Info.Height - FrameStrokeWidth;
+            float lowestY = FindLowestVertexY(_body, e.Info.Height);
 
-            using (var baseline = new SKPaint { Color = SKColors.Red, IsStroke = true, StrokeWidth = FrameStrokeWidth, IsAntialias = true })
+            using (SKPaint baseline = new SKPaint())
+            {
+                baseline.Color = SKColors.Red;
+                baseline.IsStroke = true;
+                baseline.StrokeWidth = FrameStrokeWidth;
+                baseline.IsAntialias = true;
                 canvas.DrawLine(0, lowestY, e.Info.Width, lowestY, baseline);
+            }
 
             _body.DrawMesh(canvas);
         }
 
-        // ----- Mouse: pick triangle + barycentric weights, then StartDrag(tri, u, v, w, p) -----
-        private void OnMouseDown(object? sender, MouseEventArgs e)
+        private static float FindLowestVertexY(SoftBody body, int fallback)
         {
-            if (e.Button != MouseButtons.Left || _body == null) return;
-            var p = new Vec2(e.X, e.Y);
+            if (body == null || body.Vertices == null || body.Vertices.Count == 0)
+                return fallback - FrameStrokeWidth;
 
-            if (!TryPickTriangleAndWeights(p, out int triIndex, out float u, out float v, out float w))
+            float y = body.Vertices[0].CurrentPosition.Y;
+            for (int i = 1; i < body.Vertices.Count; i++)
+            {
+                float vy = body.Vertices[i].CurrentPosition.Y;
+                if (vy > y) y = vy;
+            }
+            return y;
+        }
+
+        private void Canvas_MouseDown(object? sender, MouseEventArgs e)
+        {
+            if (_body == null || e.Button != MouseButtons.Left) return;
+
+            Vec2 p = new Vec2(e.X, e.Y);
+
+            int triIndex;
+            float u, v, w;
+
+            if (!TryPickTriangleAndWeights(p, out triIndex, out u, out v, out w))
             {
                 triIndex = NearestTriangleByCentroid(p, out u, out v, out w);
                 if (triIndex < 0) return;
             }
 
-            try { _body.ApplyClickImpulse(p); } catch { /* optional */ }
+            try { _body.ApplyClickImpulse(p); } catch { }
             _body.StartDrag(triIndex, u, v, w, p);
         }
 
-        private void OnMouseMove(object? sender, MouseEventArgs e)
+        private void Canvas_MouseMove(object? sender, MouseEventArgs e)
         {
             if (_body == null || !_body.IsDragging) return;
             _body.UpdateDrag(new Vec2(e.X, e.Y));
         }
 
-        private void OnMouseUp(object? sender, MouseEventArgs e)
+        private void Canvas_MouseUp(object? sender, MouseEventArgs e)
         {
-            if (e.Button != MouseButtons.Left || _body == null) return;
+            if (_body == null || e.Button != MouseButtons.Left) return;
             _body.EndDrag();
         }
 
-        // ---- Picking helpers ----
+        private void Canvas_MouseLeave(object? sender, EventArgs e)
+        {
+            if (_body != null) _body.EndDrag();
+        }
+
         private bool TryPickTriangleAndWeights(Vec2 p, out int triIndex, out float u, out float v, out float w)
         {
             const float EPS = -1e-3f;
+
             for (int i = 0; i < _body.Triangles.Count; i++)
             {
                 var t = _body.Triangles[i];
-                var A = _body.Vertices[t.A].CurrentPosition;
-                var B = _body.Vertices[t.B].CurrentPosition;
-                var C = _body.Vertices[t.C].CurrentPosition;
+                Vec2 A = _body.Vertices[t.A].CurrentPosition;
+                Vec2 B = _body.Vertices[t.B].CurrentPosition;
+                Vec2 C = _body.Vertices[t.C].CurrentPosition;
 
                 if (TryBarycentric(p, A, B, C, out u, out v, out w))
                 {
-                    if (u >= EPS && v >= EPS && w >= EPS) { triIndex = i; return true; }
+                    if (u >= EPS && v >= EPS && w >= EPS)
+                    {
+                        triIndex = i;
+                        return true;
+                    }
                 }
             }
-            triIndex = -1; u = v = w = 0;
+
+            triIndex = -1;
+            u = v = w = 0f;
             return false;
         }
 
         private int NearestTriangleByCentroid(Vec2 p, out float u, out float v, out float w)
         {
-            int best = -1; float bestDist = float.MaxValue; u = v = w = 0;
+            int best = -1;
+            float bestDist = float.MaxValue;
+            u = v = w = 0f;
+
             for (int i = 0; i < _body.Triangles.Count; i++)
             {
                 var t = _body.Triangles[i];
-                var A = _body.Vertices[t.A].CurrentPosition;
-                var B = _body.Vertices[t.B].CurrentPosition;
-                var C = _body.Vertices[t.C].CurrentPosition;
+                Vec2 A = _body.Vertices[t.A].CurrentPosition;
+                Vec2 B = _body.Vertices[t.B].CurrentPosition;
+                Vec2 C = _body.Vertices[t.C].CurrentPosition;
 
-                var centroid = new Vec2((A.X + B.X + C.X) / 3f, (A.Y + B.Y + C.Y) / 3f);
+                Vec2 centroid = new Vec2((A.X + B.X + C.X) / 3f, (A.Y + B.Y + C.Y) / 3f);
                 float d2 = (centroid - p).LengthSq;
                 if (d2 < bestDist)
                 {
-                    bestDist = d2; best = i;
+                    bestDist = d2;
+                    best = i;
                     TryBarycentric(p, A, B, C, out u, out v, out w);
                 }
             }
+
             return best;
         }
 
@@ -318,8 +381,125 @@ namespace GooseWiggle
 
         private Vec2 WindowScreenPosition()
         {
-            var p = DesktopLocation;
+            Point p = DesktopLocation;
             return new Vec2(p.X, p.Y);
+        }
+        
+
+        private static string? GetTrianglesPath(string[]? args)
+        {
+            if (args == null || args.Length == 0)
+                return FindLatestJson();
+
+            string? triArg = null;
+            bool openLatest = false;
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i];
+                if (a.StartsWith("--tri=")) triArg = a.Substring(6).Trim('"');
+                else if (a == "--tri") triArg = NextArg(args, i);
+                else if (a == "--open-latest") openLatest = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(triArg))
+            {
+                string? p = ResolveTriPath(triArg);
+                if (p != null) return p;
+                return null;
+            }
+
+            if (openLatest) return FindLatestJson();
+            return FindLatestJson();
+        }
+
+        private static string? NextArg(string[] args, int index)
+        {
+            if (index + 1 < args.Length) return args[index + 1];
+            return null;
+        }
+
+        private static string? ResolveTriPath(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+
+            string root = FindRepoRoot();
+            string baseDir = AppContext.BaseDirectory;
+
+            string[] candidates = new string[]
+            {
+                raw,
+                SafeFullPath(raw),
+                Path.Combine(baseDir, raw),
+                Path.Combine(baseDir, "Images", raw),
+                Path.Combine(root, raw),
+                Path.Combine(root, "Images", raw)
+            };
+
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                string c = candidates[i];
+                if (!string.IsNullOrEmpty(c) && File.Exists(c))
+                {
+                    return SafeFullPath(c);
+                }
+            }
+
+            return null;
+        }
+
+        private static string? FindLatestJson()
+        {
+            string root = FindRepoRoot();
+            string imagesDir = Path.Combine(root, "Images");
+            if (!Directory.Exists(imagesDir)) return null;
+
+            string[] files = Directory.GetFiles(imagesDir, "*.json", SearchOption.AllDirectories);
+            if (files.Length == 0) return null;
+
+            string newest = files[0];
+            DateTime newestTime = File.GetLastWriteTimeUtc(newest);
+
+            for (int i = 1; i < files.Length; i++)
+            {
+                string f = files[i];
+                DateTime t = File.GetLastWriteTimeUtc(f);
+                if (t > newestTime)
+                {
+                    newestTime = t;
+                    newest = f;
+                }
+            }
+
+            return SafeFullPath(newest);
+        }
+
+        private static string FindRepoRoot()
+        {
+            string[] starts = new string[]
+            {
+                Directory.GetCurrentDirectory(),
+                AppContext.BaseDirectory
+            };
+
+            for (int si = 0; si < starts.Length; si++)
+            {
+                DirectoryInfo dir = new DirectoryInfo(starts[si]);
+                int depth = 0;
+                while (dir != null && depth < 10)
+                {
+                    string sln = Path.Combine(dir.FullName, "SkiaSharpWigglePhysics.sln");
+                    if (File.Exists(sln)) return dir.FullName;
+                    dir = dir.Parent!;
+                    depth++;
+                }
+            }
+            return Directory.GetCurrentDirectory();
+        }
+
+        private static string SafeFullPath(string p)
+        {
+            try { return Path.GetFullPath(p); } catch { return p; }
         }
     }
 }

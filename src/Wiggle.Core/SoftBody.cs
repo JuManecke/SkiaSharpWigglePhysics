@@ -48,8 +48,7 @@ namespace Wiggle.Core
         public List<Vertex> Vertices = new();
         public List<Edge> Edges = new();
         public List<TriangleIndex> Triangles = new();
-
-        // Tunables
+        
         public float VelocityDamping = 0.990f;
         public float EdgeStiffness = 0.85f;
         public int   UpdateAtWhichFPS = 25;
@@ -240,7 +239,7 @@ namespace Wiggle.Core
             if (dt <= 0f || dt > 0.1f) dt = 1f / 60f;
             float dt2 = dt * dt;
 
-            // verlet + window jiggle + tether-to-rest
+            // window wiggle
             for (int i = 0; i < Vertices.Count; i++)
             {
                 var v = Vertices[i];
@@ -292,8 +291,7 @@ namespace Wiggle.Core
 
                 Vertices[i] = v;
             }
-
-            // satisfy distance constraints
+            
             for (int it = 0; it < UpdateAtWhichFPS; it++)
             {
                 foreach (var e in Edges)

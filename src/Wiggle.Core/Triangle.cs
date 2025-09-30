@@ -10,7 +10,7 @@ namespace Wiggle.Core
         public SKColor FillColor;
 
 
-        public Triangle(SKPoint a, SKPoint b, SKPoint c, SKColor color) // constructor
+        public Triangle(SKPoint a, SKPoint b, SKPoint c, SKColor color)
         {
             A = a;
             B = b;

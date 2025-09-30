@@ -5,7 +5,6 @@ using SkiaSharp;
 
 namespace Wiggle.Core
 {
-    // flat, serializable payload
     public record TriangleDto(float Ax,float Ay,float Bx,float By,float Cx,float Cy,uint Argb);
 
     public static class TriangleIo
@@ -53,8 +52,7 @@ namespace Wiggle.Core
             var result = new List<Triangle>();
             using var src = SKBitmap.Decode(imagePath);
             if (src == null) return result;
-
-            // Fit inside canvas with margins (keep aspect)
+            
             float maxW = canvasW - 2 * margin;
             float maxH = canvasH - 2 * margin;
             float scale = MathF.Min(maxW / src.Width, maxH / src.Height);
@@ -66,8 +64,7 @@ namespace Wiggle.Core
 
             float left = margin + (maxW - sw) * 0.5f;
             float top  = margin + (maxH - sh) * 0.5f;
-
-            // Background guess from the image border
+            
             SKColor GuessBackground(SKBitmap bmp)
             {
                 var buckets = new Dictionary<int, (int Count, SKColor Sample)>();
@@ -116,9 +113,7 @@ namespace Wiggle.Core
 
                         var col = scaled.GetPixel(sx, sy);
                         if (IsBackground(col, bg)) return;
-
-                        // IMPORTANT: this uses the same Triangle constructor you already use in Goose:
-                        // new Triangle(SKPoint a, SKPoint b, SKPoint c, SKColor fill)
+                        
                         result.Add(new Triangle(A, B, C, col));
                     }
 
